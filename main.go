@@ -31,9 +31,11 @@ func authProvider() kit.APIKeyAuth {
 		return nil
 	}}
 }
-func makePlugin(host kit.Caller) (*kit.Runtime, error) {
-	client := kit.NewQuotaHTTPClient(nil)
-	quota := kit.NewCachedQuota(provider, "Z.ai Coding Plan", func(ctx context.Context, r pluginapi.QuotaFetchRequest) (pluginapi.QuotaFetchResponse, error) {
+
+// newQuota polls through client; the kit routes each poll through the auth's
+// proxy_url, else the host's global proxy-url.
+func newQuota(client quotaDoer) *kit.CachedQuota {
+	return kit.NewCachedQuota(provider, "Z.ai Coding Plan", func(ctx context.Context, r pluginapi.QuotaFetchRequest) (pluginapi.QuotaFetchResponse, error) {
 		key, err := kit.APIKey(r.StorageJSON, r.Metadata)
 		if err != nil {
 			return pluginapi.QuotaFetchResponse{}, err
@@ -44,6 +46,10 @@ func makePlugin(host kit.Caller) (*kit.Runtime, error) {
 		}
 		return fetchQuota(ctx, base, key, client)
 	})
+}
+func makePlugin(host kit.Caller) (*kit.Runtime, error) {
+	client := kit.NewQuotaHTTPClient(nil)
+	quota := newQuota(client)
 	ex := kit.Passthrough{Provider: provider, BuildRequest: buildRequest, PrepareHTTP: prepareHTTP, ClassifyError: classifyResponse}
 	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: provider, Version: "0.1.0", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan"}, Capabilities: pluginapi.Capabilities{AuthProvider: authProvider(), ModelRegistrar: catalog{}, ModelProvider: catalog{}, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
 }
