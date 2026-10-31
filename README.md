@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
-A CLIProxyAPI v8.0.48 dynamic provider plugin using the published
-[`cliproxy-provider-kit` v0.1.0](https://github.com/TogetherWeOwn/cliproxy-provider-kit/tree/v0.1.0).
+A CLIProxyAPI v8.0.48 dynamic provider plugin using
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `f24cf1f` (v0.1.0 plus quota proxy support).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
@@ -44,8 +44,9 @@ Quota sends `Authorization: <key>` first, following the first-party usage script
 then tries `Bearer <key>` **only after HTTP 401**. No fallback on 403, 429, transport
 failure, or a failed JSON envelope. The kit bounds polling to 15 seconds/1 MiB,
 refuses redirects, redacts transport failures, and caches successful per-auth
-results for 60 seconds; errors are not cached. Its separate quota transport uses
-standard environment proxy behavior, not the executor's host transport.
+results for 60 seconds; errors are not cached. Its separate quota transport is not the
+executor's host transport, but it follows the same proxy choice: the auth's
+`proxy_url`, else the host's global `proxy-url`, else the environment.
 
 ## Model prefixes
 
