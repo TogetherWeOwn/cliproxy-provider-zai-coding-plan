@@ -24,10 +24,12 @@ func fetchQuota(ctx context.Context, base, key string, client quotaDoer) (plugin
 		defer c.CloseIdleConnections()
 		client = c
 	}
-	request := pluginapi.HTTPRequest{Method: http.MethodGet, URL: strings.TrimRight(base, "/") + "/api/monitor/usage/quota/limit", Headers: http.Header{"Authorization": {"Bearer " + key}, "Accept": {"application/json"}}}
+	// Prefer the raw-key form used by the first-party usage plugin. Some
+	// independent clients use Bearer instead; retry that form only on HTTP 401.
+	request := pluginapi.HTTPRequest{Method: http.MethodGet, URL: strings.TrimRight(base, "/") + "/api/monitor/usage/quota/limit", Headers: http.Header{"Authorization": {key}, "Accept": {"application/json"}}}
 	resp, err := client.Do(ctx, request)
 	if err != nil && kit.MapError(err).HTTPStatus == 401 {
-		request.Headers.Set("Authorization", key)
+		request.Headers.Set("Authorization", "Bearer "+key)
 		resp, err = client.Do(ctx, request)
 	}
 	if err != nil {
@@ -68,6 +70,12 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 	if json.Unmarshal(raw, &v) != nil || v.Success != nil && !*v.Success {
 		return bad()
 	}
+	if len(v.Code) > 0 {
+		code, ok := intNumber(v.Code)
+		if !ok || code != 0 && code != 200 {
+			return bad()
+		}
+	}
 	var out pluginapi.QuotaFetchResponse
 	group := pluginapi.QuotaGroup{DisplayName: "Coding Plan credits"}
 	seen := map[string]bool{}
@@ -86,7 +94,7 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		window := ""
 		if unit == 3 && num == 5 {
 			window = "5h"
-		} else if unit == 6 && num == 1 {
+		} else if unit == 6 && (num == 1 || num == 7) {
 			window = "weekly"
 		}
 		if window == "" || seen[window] {
@@ -103,10 +111,13 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		bucket := pluginapi.QuotaBucket{Window: window, RemainingFraction: float64(usage-used) / float64(usage)}
 		if len(row.NextResetTime) > 0 && string(row.NextResetTime) != "null" {
 			ms, ok := intNumber(row.NextResetTime)
-			if !ok || ms <= 0 {
+			if !ok || ms < 0 {
 				continue
 			}
-			bucket.ResetTime = time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
+			// Zero, like null, denotes an idle window with no known reset.
+			if ms > 0 {
+				bucket.ResetTime = time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
+			}
 		}
 		seen[window] = true
 		group.Buckets = append(group.Buckets, bucket)

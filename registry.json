@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "zai-coding-plan",
+      "name": "Z.ai Coding Plan",
+      "description": "API-key provider with namespaced GLM models, Anthropic Messages execution, and display-only credit quota.",
+      "author": "TogetherWeOwn",
+      "repository": "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan",
+      "version": "0.1.0",
+      "license": "MIT",
+      "tags": ["provider", "coding-plan", "glm"],
+      "auth_required": true,
+      "install": { "type": "github-release" }
+    }
+  ]
+}

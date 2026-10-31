@@ -106,16 +106,8 @@ func buildRequest(_ context.Context, r pluginapi.ExecutorRequest) (pluginapi.HTT
 	}
 	return pluginapi.HTTPRequest{Method: http.MethodPost, URL: base + "/api/anthropic/v1/messages", Headers: headers, Body: payload}, nil
 }
-func prepareHTTP(_ context.Context, r pluginapi.ExecutorHTTPRequest) (pluginapi.HTTPRequest, error) {
-	key, err := kit.APIKey(r.StorageJSON, r.Metadata)
-	if err != nil {
-		return pluginapi.HTTPRequest{}, err
-	}
-	base, err := authBase(r.StorageJSON, r.Metadata)
-	if err != nil {
-		return pluginapi.HTTPRequest{}, err
-	}
-	// Never forward caller-supplied URLs or credentials.
-	h := http.Header{"Authorization": {"Bearer " + key}, "Content-Type": {"application/json"}, "Anthropic-Version": {"2023-06-01"}}
-	return pluginapi.HTTPRequest{Method: http.MethodPost, URL: base + "/api/anthropic/v1/messages", Headers: h, Body: r.Body}, nil
+func prepareHTTP(ctx context.Context, r pluginapi.ExecutorHTTPRequest) (pluginapi.HTTPRequest, error) {
+	// Apply the same prefix stripping and credential/header allowlist as Execute.
+	// Never forward caller-supplied URLs, methods or credentials.
+	return buildRequest(ctx, pluginapi.ExecutorRequest{Payload: r.Body, StorageJSON: r.StorageJSON, AuthMetadata: r.Metadata, Headers: r.Headers})
 }

@@ -36,7 +36,9 @@ func classifyError(r pluginapi.HTTPResponse, now time.Time) *pluginabi.Error {
 		e.Code = "rate_limited"
 		e.HTTPStatus = 429
 		e.Retryable = true
-		e.RetryAfterSeconds = 10
+		if e.RetryAfterSeconds == 0 {
+			e.RetryAfterSeconds = 10
+		}
 	case 1308, 1310, 1316, 1317, 1318, 1319, 1320, 1321:
 		e.Code = "quota_exhausted"
 		e.HTTPStatus = 429
@@ -61,6 +63,13 @@ func classifyError(r pluginapi.HTTPResponse, now time.Time) *pluginabi.Error {
 		e.HTTPStatus = 429
 		e.Retryable = false
 		e.RetryAfterSeconds = 3600
+	case 1311, 1314, 1315:
+		// Unsupported plan/model, expired enterprise plan, or wrong key scope:
+		// these need an entitlement/configuration change, not a quota reset.
+		e.Code = "entitlement_unavailable"
+		e.HTTPStatus = 429
+		e.Retryable = false
+		e.RetryAfterSeconds = 3600
 	}
 	if e.HTTPStatus < 400 || e.HTTPStatus > 599 {
 		e.HTTPStatus = 502
@@ -68,7 +77,9 @@ func classifyError(r pluginapi.HTTPResponse, now time.Time) *pluginabi.Error {
 	return e
 }
 
-var resetInMessage = regexp.MustCompile(`(?i)next_flush_time["\s:=]+(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?|\d{10,13})`)
+// Official messages substitute next_flush_time into prose ("Resets at …"),
+// rather than necessarily returning a structured field with that name.
+var resetInMessage = regexp.MustCompile(`(?i)(?:next_flush_time|resets? at)["\s:=]+(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?|\d{10,13})`)
 
 func resetDelay(raw json.RawMessage, now time.Time) int {
 	s := strings.Trim(strings.TrimSpace(string(raw)), `"`)

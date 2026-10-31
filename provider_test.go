@@ -71,7 +71,7 @@ func TestQuotaFallback(t *testing.T) {
 	}))
 	defer s.Close()
 	q, err := fetchQuota(context.Background(), s.URL, "example-key", nil)
-	if err != nil || len(q.Groups) != 1 || strings.Join(seen, ",") != "Bearer example-key,example-key" {
+	if err != nil || len(q.Groups) != 1 || strings.Join(seen, ",") != "example-key,Bearer example-key" {
 		t.Fatalf("quota %+v %v %v", q, err, seen)
 	}
 }
