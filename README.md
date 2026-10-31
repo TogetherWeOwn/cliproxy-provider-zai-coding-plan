@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
 A CLIProxyAPI v8.0.48 dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `f24cf1f` (v0.1.0 plus quota proxy support).
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `de8b318` (v0.1.0 plus quota proxy support).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
