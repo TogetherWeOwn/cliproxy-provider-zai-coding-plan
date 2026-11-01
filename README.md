@@ -27,7 +27,7 @@ Optional host fields are `id`, `label`, `prefix`, `proxy_url`, `weight`, `priori
 and `disabled`. An optional `plan` hint is retained but never supplies quota
 limits. Without `id`, the auth ID is `zai-coding-plan:` plus the first 12 hex
 digits of SHA-256 of the trimmed key; repeated keys produce the same ID.
-Login methods report API-key-only; refresh preserves the auth record.
+Refresh preserves the auth record.
 
 | Region | Inference POST | Quota GET |
 | --- | --- | --- |
@@ -47,6 +47,15 @@ refuses redirects, redacts transport failures, and caches successful per-auth
 results for 60 seconds; errors are not cached. Its separate quota transport is not the
 executor's host transport, but it follows the same proxy choice: the auth's
 `proxy_url`, else the host's global `proxy-url`, else the environment.
+
+## Management-UI login
+
+The management UI's login card serves a kit login page that prompts for the API
+key and the optional `region` (`global` or `cn`; blank means global), then
+submits them over an authenticated management POST (secrets travel in the POST
+body only, never in URLs, logs or process arguments). The submission runs the
+same ParseAuth validation as an uploaded auth file. On a remote host, set
+`CLIPROXY_BASE` to an `https://` base so the key is encrypted in transit.
 
 ## Model prefixes
 
@@ -112,12 +121,12 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.1.2_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
+`zai-coding-plan_0.2.0_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
 (refusing a library that imports GLIBC newer than 2.34), and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.2`
+are tested in `integration/hostcompat`. Upload both assets in a matching `v0.2.0`
 GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
 
 The host-compatibility module imports the **unmodified pinned v8.0.49 host** and

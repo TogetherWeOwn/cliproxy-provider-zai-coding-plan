@@ -7,7 +7,7 @@
       "description": "API-key provider with namespaced GLM models, Anthropic Messages execution, and display-only credit quota.",
       "author": "TogetherWeOwn",
       "repository": "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "license": "MIT",
       "tags": ["provider", "coding-plan", "glm"],
       "auth_required": true,
