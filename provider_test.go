@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	providerkit "github.com/TogetherWeOwn/cliproxy-provider-kit"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
@@ -46,12 +47,17 @@ func TestQuotaParser(t *testing.T) {
 	if err != nil || len(q.Groups) != 1 || len(q.Groups[0].Buckets) != 2 {
 		t.Fatalf("quota: %+v %v", q, err)
 	}
-	if q.Groups[0].Buckets[0].RemainingFraction != .75 || q.Groups[0].Buckets[0].ResetTime != "" || q.Groups[0].Buckets[1].RemainingFraction != .7 || q.Summary[0].Value != 75 {
+	if q.Groups[0].Buckets[0].Window != "5-hour limit" || q.Groups[0].Buckets[0].RemainingFraction != .75 ||
+		q.Groups[0].Buckets[0].ResetTime != "" || q.Groups[0].Buckets[1].Window != "Weekly limit" ||
+		q.Groups[0].Buckets[1].RemainingFraction != .7 || len(q.Summary) != 0 {
 		t.Fatalf("quota mapping: %+v", q)
+	}
+	if v := providerkit.CheckCard(q); len(v) != 0 {
+		t.Fatalf("card style violations: %v", v)
 	}
 	partial := []byte(`{"success":true,"data":{"limits":[{"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":0,"currentValue":1},{"type":"CREDIT_LIMIT","unit":6,"number":1,"usage":100,"currentValue":10}]}}`)
 	q, err = parseQuota(partial)
-	if err != nil || len(q.Groups[0].Buckets) != 1 || q.Groups[0].Buckets[0].Window != "weekly" {
+	if err != nil || len(q.Groups[0].Buckets) != 1 || q.Groups[0].Buckets[0].Window != "Weekly limit" {
 		t.Fatalf("partial: %+v %v", q, err)
 	}
 	_, err = parseQuota([]byte(`{"success":true,"data":{"limits":[{"type":"TOKENS_LIMIT"}]}}`))

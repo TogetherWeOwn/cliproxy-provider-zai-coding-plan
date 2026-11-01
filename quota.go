@@ -108,7 +108,10 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		if !ok || used < 0 || used > usage {
 			continue
 		}
-		bucket := pluginapi.QuotaBucket{Window: window, RemainingFraction: float64(usage-used) / float64(usage)}
+		// The remaining credits are visible as the bar fill; a per-window chip
+		// would only repeat the bar, so buckets carry no Description and the
+		// card shows no summary.
+		reset := ""
 		if len(row.NextResetTime) > 0 && string(row.NextResetTime) != "null" {
 			ms, ok := intNumber(row.NextResetTime)
 			if !ok || ms < 0 {
@@ -116,12 +119,11 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 			}
 			// Zero, like null, denotes an idle window with no known reset.
 			if ms > 0 {
-				bucket.ResetTime = time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
+				reset = time.UnixMilli(ms).UTC().Format(time.RFC3339)
 			}
 		}
 		seen[window] = true
-		group.Buckets = append(group.Buckets, bucket)
-		out.Summary = append(out.Summary, pluginapi.QuotaMetric{Key: "credits_remaining_" + window, Label: "Credits remaining " + window, Value: float64(usage - used), Unit: "credits", Format: "number"})
+		group.Buckets = append(group.Buckets, kit.NewQuotaBucket(window, float64(usage-used)/float64(usage), reset))
 	}
 	if len(group.Buckets) == 0 {
 		return bad()
