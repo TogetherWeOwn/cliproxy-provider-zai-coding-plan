@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
 A CLIProxyAPI v8.0.48 dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `de8b318` (v0.1.0 plus quota proxy support).
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `c81b686` (v0.1.0 plus quota proxy support and newer-host-schema acceptance).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
@@ -112,11 +112,11 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.1.0_linux_amd64.zip` containing `zai-coding-plan.so`, and writes
+`zai-coding-plan_0.1.1_linux_amd64.zip` containing `zai-coding-plan.so`, and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.0`
+are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.1`
 GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
 
 The host-compatibility module imports the **unmodified pinned v8.0.48 host** and

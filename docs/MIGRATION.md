@@ -8,7 +8,7 @@ subscription-pool scheduling settings into this provider.
 
 ## 1. Prepare and retain rollback material
 
-1. Confirm that the deployment's CLIProxy version is v8.0.48 and the platform is
+1. Confirm that the deployment's CLIProxy version is v8.0.48 or newer and the platform is
    Linux amd64 with a compatible glibc. Use the published kit dependency pinned
    in `go.mod`; do not introduce a local `replace` or modify CLIProxy core.
 2. Run all README verification commands. Build with

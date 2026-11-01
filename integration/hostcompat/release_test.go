@@ -31,7 +31,7 @@ func TestReleasePackagingAndRealStoreRegistry(t *testing.T) {
 		t.Fatalf("real store registry parser %+v: %v", manifest, err)
 	}
 	p := manifest.Plugins[0]
-	if p.ID != "zai-coding-plan" || p.Version != "0.1.0" || p.Repository != "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan" || pluginstore.PluginInstallType(p) != "github-release" || !p.AuthRequired {
+	if p.ID != "zai-coding-plan" || p.Version != "0.1.1" || p.Repository != "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan" || pluginstore.PluginInstallType(p) != "github-release" || !p.AuthRequired {
 		t.Fatalf("store metadata %+v", p)
 	}
 	outDir := t.TempDir()
@@ -43,7 +43,7 @@ func TestReleasePackagingAndRealStoreRegistry(t *testing.T) {
 		t.Fatalf("package release: %v\n%s", err, out)
 	}
 	name := pluginstore.ArchiveName(p.ID, p.Version, "linux", "amd64")
-	if name != "zai-coding-plan_0.1.0_linux_amd64.zip" {
+	if name != "zai-coding-plan_0.1.1_linux_amd64.zip" {
 		t.Fatalf("store archive name %q", name)
 	}
 	archive, err := os.ReadFile(filepath.Join(outDir, name))
