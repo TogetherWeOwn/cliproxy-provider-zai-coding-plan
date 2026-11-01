@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
 A CLIProxyAPI v8.0.49+ (plugin RPC schema 10) dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `21069bf` (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `88850ce` (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
@@ -55,10 +55,10 @@ executor's host transport, but it follows the same proxy choice: the auth's
 | `zai/glm-5.3` | `glm-5.3` |
 | `zai/glm-5.3-flash` | `glm-5.3-flash` |
 
-Every registered model has the fixed `zai/` namespace, independently of the
-optional host auth-file `prefix`. Both execution paths and the low-level HTTP
-executor strip that namespace. No legacy aliases or `[1m]` pseudo-models are
-advertised. Model availability is static, not inferred by making provider calls.
+Fixed model namespace `zai/`; auth `prefix` does not replace it. Both
+execution paths and the low-level HTTP executor strip that namespace. No
+legacy aliases or `[1m]` pseudo-models are advertised. Model availability is
+static, not inferred by making provider calls.
 
 ## Quota and errors
 
