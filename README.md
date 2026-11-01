@@ -27,7 +27,7 @@ Optional host fields are `id`, `label`, `prefix`, `proxy_url`, `weight`, `priori
 and `disabled`. An optional `plan` hint is retained but never supplies quota
 limits. Without `id`, the auth ID is `zai-coding-plan:` plus the first 12 hex
 digits of SHA-256 of the trimmed key; repeated keys produce the same ID.
-Login methods report API-key-only; refresh preserves the auth record.
+Refresh preserves the auth record.
 
 | Region | Inference POST | Quota GET |
 | --- | --- | --- |
@@ -47,6 +47,15 @@ refuses redirects, redacts transport failures, and caches successful per-auth
 results for 60 seconds; errors are not cached. Its separate quota transport is not the
 executor's host transport, but it follows the same proxy choice: the auth's
 `proxy_url`, else the host's global `proxy-url`, else the environment.
+
+## Management-UI login
+
+The management UI's login card serves a kit login page that prompts for the API
+key and the optional `region` (`global` or `cn`; blank means global), then
+submits them over an authenticated management POST (secrets travel in the POST
+body only, never in URLs, logs or process arguments). The submission runs the
+same ParseAuth validation as an uploaded auth file. On a remote host, set
+`CLIPROXY_BASE` to an `https://` base so the key is encrypted in transit.
 
 ## Model prefixes
 

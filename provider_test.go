@@ -15,7 +15,10 @@ import (
 )
 
 func TestAuthAndCatalog(t *testing.T) {
-	p := authProvider()
+	p, err := authProvider()
+	if err != nil {
+		t.Fatal(err)
+	}
 	input := pluginapi.AuthParseRequest{RawJSON: []byte(`{"type":"zai-coding-plan","api_key":"example-key"}`)}
 	r, err := p.ParseAuth(context.Background(), input)
 	sum := sha256.Sum256([]byte("example-key"))
