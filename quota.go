@@ -93,9 +93,9 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		}
 		window := ""
 		if unit == 3 && num == 5 {
-			window = "5h"
+			window = kit.CardWindowFiveHour
 		} else if unit == 6 && (num == 1 || num == 7) {
-			window = "weekly"
+			window = kit.CardWindowWeekly
 		}
 		if window == "" || seen[window] {
 			continue
@@ -121,7 +121,6 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		}
 		seen[window] = true
 		group.Buckets = append(group.Buckets, bucket)
-		out.Summary = append(out.Summary, pluginapi.QuotaMetric{Key: "credits_remaining_" + window, Label: "Credits remaining " + window, Value: float64(usage - used), Unit: "credits", Format: "number"})
 	}
 	if len(group.Buckets) == 0 {
 		return bad()
