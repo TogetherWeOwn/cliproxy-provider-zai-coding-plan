@@ -51,7 +51,7 @@ func makePlugin(host kit.Caller) (*kit.Runtime, error) {
 	client := kit.NewQuotaHTTPClient(nil)
 	quota := newQuota(client)
 	ex := kit.Passthrough{Provider: provider, BuildRequest: buildRequest, PrepareHTTP: prepareHTTP, ClassifyError: classifyResponse}
-	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: provider, Version: "0.1.2", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan"}, Capabilities: pluginapi.Capabilities{AuthProvider: authProvider(), ModelRegistrar: catalog{}, ModelProvider: catalog{}, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
+	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: provider, Version: "0.1.2", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan"}, ModelNamespace: "zai", Capabilities: pluginapi.Capabilities{AuthProvider: authProvider(), ModelRegistrar: catalog{}, ModelProvider: catalog{}, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
 }
 
 type catalog struct{}

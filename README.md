@@ -55,10 +55,10 @@ executor's host transport, but it follows the same proxy choice: the auth's
 | `zai/glm-5.3` | `glm-5.3` |
 | `zai/glm-5.3-flash` | `glm-5.3-flash` |
 
-Every registered model has the fixed `zai/` namespace, independently of the
-optional host auth-file `prefix`. Both execution paths and the low-level HTTP
-executor strip that namespace. No legacy aliases or `[1m]` pseudo-models are
-advertised. Model availability is static, not inferred by making provider calls.
+Fixed model namespace `zai/`; auth `prefix` does not replace it. Both
+execution paths and the low-level HTTP executor strip that namespace. No
+legacy aliases or `[1m]` pseudo-models are advertised. Model availability is
+static, not inferred by making provider calls.
 
 ## Quota and errors
 
