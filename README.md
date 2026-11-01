@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
-A CLIProxyAPI v8.0.48 dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `c81b686` (v0.1.0 plus quota proxy support and newer-host-schema acceptance).
+A CLIProxyAPI v8.0.49+ (plugin RPC schema 10) dynamic provider plugin using
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `21069bf` (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
@@ -86,7 +86,7 @@ are interpreted as UTC; that assumption still needs live confirmation. Error
 messages exposed by this plugin never include the upstream body or credential.
 Unrecognized errors retain their HTTP status (invalid statuses become 502).
 
-**Host limitation:** v8.0.48's plugin RPC error adapter carries status, code, and
+**Host limitation:** the v8.0.48 and v8.0.49 plugin RPC error adapter carries status, code, and
 retry hints but does not implement the native `TransientRateLimitError` interface.
 Consequently native selection applies its generic 429 path, including a
 30-second minimum cooldown, even to the plugin's short transient hint. The
@@ -97,7 +97,7 @@ quota-state markings. No local host patch or custom scheduler is included.
 
 ## Build, verify, and package
 
-Requires Go **1.26.10**, CGO, a C compiler, Python 3 (release packaging), and a
+Requires Go **1.26.10**, CGO, a C compiler, binutils `objdump` and Python 3 (release packaging), and a
 Linux amd64 builder for release assets. No local module replacements are used.
 
 ```sh
@@ -112,14 +112,15 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.1.1_linux_amd64.zip` containing `zai-coding-plan.so`, and writes
+`zai-coding-plan_0.1.2_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
+(refusing a library that imports GLIBC newer than 2.34), and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.1`
+are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.2`
 GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
 
-The host-compatibility module imports the **unmodified pinned v8.0.48 host** and
+The host-compatibility module imports the **unmodified pinned v8.0.49 host** and
 builds a test-only `hostcompat`-tagged library, restricted to literal HTTP loopback
 upstreams. Production builds must not use that tag. Tests use placeholder keys
 and `httptest` only, including auth persistence, model catalogs, usage accounting,

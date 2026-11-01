@@ -134,7 +134,7 @@ func TestRealHostLoader(t *testing.T) {
 		t.Fatalf("registration %+v", host.RegisteredPlugins())
 	}
 	infos := host.RegisteredPlugins()
-	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.1.1" {
+	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.1.2" {
 		t.Fatalf("quota capability/metadata %+v", infos)
 	}
 	parse := func(id, key string) *coreauth.Auth {
@@ -281,7 +281,7 @@ func TestRealHostLoader(t *testing.T) {
 		t.Fatalf("native exhaustion cooldown %+v", cooled.ModelStates)
 	}
 
-	// The v8.0.48 RPC adapter retains status/hints, but not the newer native
+	// The v8.0.48/v8.0.49 RPC adapter retains status/hints, but not the newer native
 	// TransientRateLimitError interface. Its generic 429 floor is 30 seconds.
 	transientManager := coreauth.NewManager(nil, nil, nil)
 	transientManager.SetConfig(cfg)

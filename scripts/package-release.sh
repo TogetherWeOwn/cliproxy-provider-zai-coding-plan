@@ -32,16 +32,29 @@ fi
 CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOFLAGS= go -C "$root" build \
   -trimpath -tags='' -buildmode=c-shared -o "$stage/$id.so" .
 
-python3 -I - "$stage/$id.so" "$out" "$id" "$version" <<'PY'
+# Refuse an artifact whose imported GLIBC versions exceed the supported floor.
+objdump -T "$stage/$id.so" > "$stage/dynamic-symbols.txt"
+python3 -I - "$stage/dynamic-symbols.txt" <<'PY'
+import pathlib, re, sys
+text = pathlib.Path(sys.argv[1]).read_text()
+versions = [tuple(map(int, v.split("."))) for v in re.findall(r"GLIBC_([0-9.]+)", text)]
+if "GLIBC_PRIVATE" in text or not versions or max(versions) > (2, 34):
+    raise SystemExit("Release must import only public GLIBC symbols at version 2.34 or older")
+print("Maximum imported GLIBC version: " + ".".join(map(str, max(versions))), file=sys.stderr)
+PY
+
+python3 -I - "$stage/$id.so" "$root/LICENSE" "$out" "$id" "$version" <<'PY'
 import hashlib, pathlib, sys, zipfile
-lib, out, plugin_id, version = sys.argv[1:]
+lib, license_file, out, plugin_id, version = sys.argv[1:]
 archive = pathlib.Path(out) / f"{plugin_id}_{version}_linux_amd64.zip"
 with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
     # Stable member metadata; the compiler determines binary reproducibility.
-    info = zipfile.ZipInfo(f"{plugin_id}.so", date_time=(1980, 1, 1, 0, 0, 0))
-    info.external_attr = 0o100644 << 16
-    info.compress_type = zipfile.ZIP_DEFLATED
-    z.writestr(info, pathlib.Path(lib).read_bytes())
+    # The license travels with the binary, as in the sibling provider releases.
+    for name, source in ((f"{plugin_id}.so", lib), ("LICENSE", license_file)):
+        info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+        info.external_attr = 0o100644 << 16
+        info.compress_type = zipfile.ZIP_DEFLATED
+        z.writestr(info, pathlib.Path(source).read_bytes())
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 (pathlib.Path(out) / "checksums.txt").write_text(f"{digest}  {archive.name}\n", encoding="ascii")
 print(archive.name)
