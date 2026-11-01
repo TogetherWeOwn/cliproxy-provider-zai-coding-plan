@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
 A CLIProxyAPI v8.0.49+ (plugin RPC schema 10) dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `21069bf` (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) at `88850ce` (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
