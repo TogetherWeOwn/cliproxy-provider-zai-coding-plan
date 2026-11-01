@@ -121,12 +121,12 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.1.2_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
+`zai-coding-plan_0.2.0_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
 (refusing a library that imports GLIBC newer than 2.34), and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.2`
+are tested in `integration/hostcompat`. Upload both assets in a matching `v0.2.0`
 GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
 
 The host-compatibility module imports the **unmodified pinned v8.0.49 host** and
