@@ -8,7 +8,10 @@ subscription-pool scheduling settings into this provider.
 
 ## 1. Prepare and retain rollback material
 
-1. Confirm that the deployment's CLIProxy version is v8.0.48 and the platform is
+1. Confirm that the deployment's CLIProxy version is a tested host: v8.0.48 (pinned
+   in `integration/hostcompat`) or v8.0.49 (RPC schema 10, validated by pointing
+   `integration/hostcompat` at it). For any other host version, run
+   `integration/hostcompat` against it first. The platform must be
    Linux amd64 with a compatible glibc. Use the published kit dependency pinned
    in `go.mod`; do not introduce a local `replace` or modify CLIProxy core.
 2. Run all README verification commands. Build with
