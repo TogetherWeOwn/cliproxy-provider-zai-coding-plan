@@ -147,7 +147,7 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		}
 		bucket := pluginapi.QuotaBucket{Window: window, RemainingFraction: float64(usage-used) / float64(usage)}
 		if approximated {
-			bucket.Description = "fractional credit values truncated to integers"
+			bucket.Description = "fractional credits approximated conservatively"
 		}
 		if len(row.NextResetTime) > 0 && string(row.NextResetTime) != "null" {
 			ms, ok := intNumber(row.NextResetTime)
