@@ -70,9 +70,10 @@ Quota displays only recognized `CREDIT_LIMIT` rows. `usage` is capacity;
 `unit=6, number=1` or the observed `number=7` variant. The remaining fraction is
 `(usage-currentValue)/usage`, not the rounded `percentage` field. Reset times are
 epoch milliseconds; null, absent, and zero mean unknown. Integral decimal numbers
-are accepted, and so are fractional credit values: they are truncated toward zero
-(conservative — remaining quota is never overstated) and the bucket carries a
-`description` noting the approximation. Malformed/unknown rows are not guessed. A
+are accepted, and so are fractional credit values: capacity is truncated down and
+consumption rounded up (conservative — the remaining fraction and remaining
+credits never exceed the exact values), and the bucket carries a `description`
+noting the approximation. Malformed/unknown rows are not guessed. A
 valid window is retained when another is invalid. Legacy token/MCP-only shapes
 return an unknown-quota error rather than fabricated credit allowances. Plan
 metadata comes from `data.level`/`data.planName`, if present.

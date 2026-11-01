@@ -54,8 +54,8 @@ func intNumber(raw json.RawMessage) (int64, bool) {
 }
 
 // floatNumber accepts any finite JSON number, including fractional credit
-// balances that intNumber rejects. Callers truncate toward zero and mark the
-// bucket approximated; truncation never overstates remaining quota.
+// balances that intNumber rejects. Callers round capacity down and consumption
+// up, and mark the bucket approximated; remaining quota is never overstated.
 func floatNumber(raw json.RawMessage) (float64, bool) {
 	if len(raw) == 0 {
 		return 0, false
@@ -133,10 +133,13 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		}
 		used, ok := intNumber(row.CurrentValue)
 		if !ok {
+			// Fractional consumption is rounded UP while capacity
+			// truncates down, so the remaining fraction stays
+			// conservative; over-quota rows fall out below.
 			if f, ok := floatNumber(row.CurrentValue); !ok || f < 0 {
 				continue
 			} else {
-				used, approximated = int64(f), true
+				used, approximated = int64(math.Ceil(f)), true
 			}
 		}
 		if usage <= 0 || used < 0 || used > usage {

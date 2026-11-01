@@ -34,24 +34,32 @@ func TestQuotaInvalidRowsDoNotHideValidWindow(t *testing.T) {
 	}
 }
 
-// Fractional credit balances are truncated toward zero (conservative: the
-// remaining fraction is never overstated) and marked approximated, instead of
-// blinding the window with unknown_quota.
+// Fractional credit balances are approximated conservatively — capacity
+// truncated down, consumption rounded up, so neither the remaining fraction
+// nor the remaining credits ever exceed the exact values — and marked on the
+// bucket, instead of blinding the window with unknown_quota.
 func TestQuotaFractionalCreditsApproximated(t *testing.T) {
 	q, err := parseQuota([]byte(`{"success":true,"data":{"limits":[{"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":100.5,"currentValue":1.9},{"type":"CREDIT_LIMIT","unit":6,"number":1,"usage":200,"currentValue":60.4,"nextResetTime":1893456000000}]}}`))
 	if err != nil || len(q.Groups) != 1 || len(q.Groups[0].Buckets) != 2 {
 		t.Fatalf("fractional quota %+v %v", q, err)
 	}
 	five := q.Groups[0].Buckets[0]
-	if five.Window != "5h" || five.RemainingFraction != .99 || five.Description == "" {
-		t.Fatalf("fractional 5h not approximated: %+v", five)
+	// Exact: (100.5-1.9)/100.5 = 0.9810…; reported 98/100 = 0.98.
+	if five.Window != "5h" || five.RemainingFraction != .98 || five.Description == "" {
+		t.Fatalf("fractional 5h not conservative: %+v", five)
 	}
 	weekly := q.Groups[0].Buckets[1]
-	if weekly.Window != "weekly" || weekly.RemainingFraction != .7 || weekly.Description == "" {
-		t.Fatalf("fractional weekly not approximated: %+v", weekly)
+	// Exact: (200-60.4)/200 = 0.698; reported 139/200 = 0.695.
+	if weekly.Window != "weekly" || weekly.RemainingFraction != .695 || weekly.Description == "" {
+		t.Fatalf("fractional weekly not conservative: %+v", weekly)
 	}
-	if len(q.Summary) != 2 || q.Summary[0].Value != 99 || q.Summary[1].Value != 140 {
+	if len(q.Summary) != 2 || q.Summary[0].Value != 98 || q.Summary[1].Value != 139 {
 		t.Fatalf("fractional summary %+v", q.Summary)
+	}
+	// Near-total consumption truncates to exhausted, never to full.
+	empty, err := parseQuota([]byte(`{"success":true,"data":{"limits":[{"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":1,"currentValue":0.9}]}}`))
+	if err != nil || len(empty.Groups[0].Buckets) != 1 || empty.Groups[0].Buckets[0].RemainingFraction != 0 {
+		t.Fatalf("near-exhausted fractional not exhausted: %+v %v", empty, err)
 	}
 }
 
