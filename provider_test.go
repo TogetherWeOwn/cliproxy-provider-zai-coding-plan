@@ -14,8 +14,47 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
+func TestAuthDuplicateKeyAndReload(t *testing.T) {
+	p := newAuthProvider()
+	ctx := context.Background()
+	parse := func(file, raw string) (pluginapi.AuthParseResponse, error) {
+		return p.ParseAuth(ctx, pluginapi.AuthParseRequest{Provider: "zai-coding-plan", FileName: file, RawJSON: []byte(raw)})
+	}
+	a, err := parse("first.json", `{"type":"zai-coding-plan","api_key":"example-key","region":"global"}`)
+	if err != nil || !a.Handled || a.Auth.ID == "" {
+		t.Fatalf("parse %+v %v", a, err)
+	}
+	if _, err = parse("second.json", `{"type":"zai-coding-plan","api_key":"example-key"}`); err == nil {
+		t.Fatal("duplicate key in a second file accepted")
+	}
+	b, err := parse("first.json", `{"type":"zai-coding-plan","api_key":" example-key ","region":"cn"}`)
+	if err != nil || b.Auth.ID != a.Auth.ID {
+		t.Fatalf("reload %+v %v", b, err)
+	}
+	if _, err = parse("first.json", `{"type":"zai-coding-plan","api_key":"replacement-key"}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = parse("second.json", `{"type":"zai-coding-plan","api_key":"example-key"}`); err != nil {
+		t.Fatal("old key ownership not released", err)
+	}
+	for _, raw := range []string{`{"type":"zai-coding-plan","api_key":"a","region":"eu"}`, `{"type":"zai-coding-plan","api_key":""}`} {
+		if _, err = parse("invalid.json", raw); err == nil {
+			t.Fatalf("accepted %s", raw)
+		}
+	}
+	if _, err = p.StartLogin(ctx, pluginapi.AuthLoginStartRequest{}); err == nil {
+		t.Fatal("API key provider offered login")
+	}
+	if _, err = p.PollLogin(ctx, pluginapi.AuthLoginPollRequest{}); err == nil {
+		t.Fatal("API key provider polled login")
+	}
+	refreshed, err := p.RefreshAuth(ctx, pluginapi.AuthRefreshRequest{AuthID: a.Auth.ID, StorageJSON: a.Auth.StorageJSON, Metadata: a.Auth.Metadata})
+	if err != nil || string(refreshed.Auth.StorageJSON) != string(a.Auth.StorageJSON) {
+		t.Fatalf("refresh %+v %v", refreshed, err)
+	}
+}
 func TestAuthAndCatalog(t *testing.T) {
-	p := authProvider()
+	p := newAuthProvider()
 	input := pluginapi.AuthParseRequest{RawJSON: []byte(`{"type":"zai-coding-plan","api_key":"example-key"}`)}
 	r, err := p.ParseAuth(context.Background(), input)
 	sum := sha256.Sum256([]byte("example-key"))

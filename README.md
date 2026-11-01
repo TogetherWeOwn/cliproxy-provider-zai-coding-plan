@@ -26,7 +26,10 @@ entitlement. The plugin deliberately does not accept arbitrary upstream URLs.
 Optional host fields are `id`, `label`, `prefix`, `proxy_url`, `weight`, `priority`,
 and `disabled`. An optional `plan` hint is retained but never supplies quota
 limits. Without `id`, the auth ID is `zai-coding-plan:` plus the first 12 hex
-digits of SHA-256 of the trimmed key; repeated keys produce the same ID.
+digits of SHA-256 of the trimmed key. Re-saving one file is safe, and replacing
+its key releases the old digest; configuring the same API key in a second auth
+file is rejected as a duplicate (`duplicate_auth`), so two files can never
+derive the same identity silently.
 Login methods report API-key-only; refresh preserves the auth record.
 
 | Region | Inference POST | Quota GET |
@@ -67,7 +70,10 @@ Quota displays only recognized `CREDIT_LIMIT` rows. `usage` is capacity;
 `unit=6, number=1` or the observed `number=7` variant. The remaining fraction is
 `(usage-currentValue)/usage`, not the rounded `percentage` field. Reset times are
 epoch milliseconds; null, absent, and zero mean unknown. Integral decimal numbers
-are accepted; fractional credits and malformed/unknown rows are not guessed. A
+are accepted, and so are fractional credit values: capacity is truncated down and
+consumption rounded up (conservative — the remaining fraction and remaining
+credits never exceed the exact values), and the bucket carries a `description`
+noting the approximation. Malformed/unknown rows are not guessed. A
 valid window is retained when another is invalid. Legacy token/MCP-only shapes
 return an unknown-quota error rather than fabricated credit allowances. Plan
 metadata comes from `data.level`/`data.planName`, if present.
@@ -112,12 +118,12 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.1.2_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
+`zai-coding-plan_0.1.3_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
 (refusing a library that imports GLIBC newer than 2.34), and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.2`
+are tested in `integration/hostcompat`. Upload both assets in a matching `v0.1.3`
 GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
 
 The host-compatibility module imports the **unmodified pinned v8.0.49 host** and

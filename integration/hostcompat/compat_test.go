@@ -134,7 +134,7 @@ func TestRealHostLoader(t *testing.T) {
 		t.Fatalf("registration %+v", host.RegisteredPlugins())
 	}
 	infos := host.RegisteredPlugins()
-	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.1.2" {
+	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.1.3" {
 		t.Fatalf("quota capability/metadata %+v", infos)
 	}
 	parse := func(id, key string) *coreauth.Auth {

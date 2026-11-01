@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -50,6 +51,24 @@ func intNumber(raw json.RawMessage) (int64, bool) {
 		return 0, false
 	}
 	return r.Num().Int64(), true
+}
+
+// floatNumber accepts any finite JSON number, including fractional credit
+// balances that intNumber rejects. Callers round capacity down and consumption
+// up, and mark the bucket approximated; remaining quota is never overstated.
+func floatNumber(raw json.RawMessage) (float64, bool) {
+	if len(raw) == 0 {
+		return 0, false
+	}
+	var n json.Number
+	if json.Unmarshal(raw, &n) != nil {
+		return 0, false
+	}
+	f, err := n.Float64()
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || math.Abs(f) > 9e18 {
+		return 0, false
+	}
+	return f, true
 }
 func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 	bad := func() (pluginapi.QuotaFetchResponse, error) {
@@ -101,14 +120,35 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 			continue
 		}
 		usage, ok := intNumber(row.Usage)
-		if !ok || usage <= 0 {
-			continue
+		approximated := false
+		if !ok {
+			// Fractional credit capacities are truncated toward zero and
+			// marked on the bucket; the remaining fraction is then
+			// conservative, never overstated.
+			if f, ok := floatNumber(row.Usage); !ok || f <= 0 {
+				continue
+			} else {
+				usage, approximated = int64(f), true
+			}
 		}
 		used, ok := intNumber(row.CurrentValue)
-		if !ok || used < 0 || used > usage {
+		if !ok {
+			// Fractional consumption is rounded UP while capacity
+			// truncates down, so the remaining fraction stays
+			// conservative; over-quota rows fall out below.
+			if f, ok := floatNumber(row.CurrentValue); !ok || f < 0 {
+				continue
+			} else {
+				used, approximated = int64(math.Ceil(f)), true
+			}
+		}
+		if usage <= 0 || used < 0 || used > usage {
 			continue
 		}
 		bucket := pluginapi.QuotaBucket{Window: window, RemainingFraction: float64(usage-used) / float64(usage)}
+		if approximated {
+			bucket.Description = "fractional credits approximated conservatively"
+		}
 		if len(row.NextResetTime) > 0 && string(row.NextResetTime) != "null" {
 			ms, ok := intNumber(row.NextResetTime)
 			if !ok || ms < 0 {
