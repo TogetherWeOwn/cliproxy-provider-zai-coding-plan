@@ -8,10 +8,11 @@ subscription-pool scheduling settings into this provider.
 
 ## 1. Prepare and retain rollback material
 
-1. Confirm that the deployment's CLIProxy version is a tested host: v8.0.48 (pinned
-   in `integration/hostcompat`) or v8.0.49 (RPC schema 10, validated by pointing
-   `integration/hostcompat` at it). For any other host version, run
-   `integration/hostcompat` against it first. The platform must be
+1. Confirm that the deployment's CLIProxy version is v8.0.49 or newer (plugin RPC
+   schema 10, pinned in `integration/hostcompat`). The kit refuses hosts older
+   than schema 10, so v8.0.48 and earlier hosts must stay on plugin v0.1.1. For
+   any host version other than v8.0.49, run `integration/hostcompat` against it
+   first. The platform must be
    Linux amd64 with a compatible glibc. Use the published kit dependency pinned
    in `go.mod`; do not introduce a local `replace` or modify CLIProxy core.
 2. Run all README verification commands. Build with
@@ -61,7 +62,7 @@ subscription-pool scheduling settings into this provider.
    support, and that models appear as `zai/glm-5.3` and
    `zai/glm-5.3-flash` (plus any optional host auth prefix).
 5. Mock acceptance needs no subscription: the hostcompat integration suite loads
-   the actual v8.0.48 host, drives all capabilities against `httptest`, verifies
+   the actual v8.0.49 host, drives all capabilities against `httptest`, verifies
    real streaming and token accounting, and exercises native two-auth failover.
    The test-only loopback upstream setting is intentionally absent in releases.
 6. **Stop here without credentials and explicit live-test authorization.** When
@@ -90,7 +91,7 @@ subscription-pool scheduling settings into this provider.
    needed.
 4. Confirm registration, auth persistence, model namespacing, quota UI, normal
    request errors, and authorized usage. Monitor for unexpected 401/429s and
-   billing. A transient 1305 remains subject to the v8.0.48 generic 429 cooldown
+   billing. A transient 1305 remains subject to the v8.0.49 generic 429 cooldown
    floor described in the README; do not compensate with another scheduler.
 5. Update clients from any old unprefixed model names to the fixed `zai/` IDs.
    Remove old Z.ai-only config only after cutover acceptance; keep rollback
@@ -109,7 +110,7 @@ model routes and normal service after rollback.
 
 ## Host-contract references
 
-These paths refer to the pinned public CLIProxyAPI `v8.0.48` source, not a local
+These paths refer to the pinned public CLIProxyAPI `v8.0.49` source, not a local
 fork: `config.example.yaml` (plugin configuration and `store-sources`),
 `internal/pluginstore/registry.go` (registry schema),
 `internal/pluginstore/github.go` (asset/checksum naming),

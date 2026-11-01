@@ -96,7 +96,7 @@ upstream recovery.
 
 ## Host evidence and verification boundaries
 
-Host contracts were checked against public CLIProxyAPI **v8.0.48**:
+Host contracts were checked against public CLIProxyAPI **v8.0.49** (plugin RPC schema 10):
 `internal/pluginstore/registry.go` / `github.go` (schema/asset names),
 `internal/pluginhost/loader_unix.go` (C ABI and resident runtime),
 `internal/pluginhost/adapters.go` / `adapters_executors.go` (models/executors),
@@ -105,7 +105,7 @@ Host contracts were checked against public CLIProxyAPI **v8.0.48**:
 The real-loader integration consumes that exact upstream module, not a copied
 host or a local core patch.
 
-The native transient-rate-limit interface is not carried by v8.0.48's RPC error
+The native transient-rate-limit interface is not carried by v8.0.49's RPC error
 adapter; its generic 429 path applies a 30-second floor to short transient hints.
 This is covered by the real-host integration and documented in the README; it is
 not fixed by adding another scheduler. Quota is display-only throughout.
