@@ -130,25 +130,37 @@ func TestRealHostLoader(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	host.ApplyConfig(ctx, cfg)
-	if !host.PluginLoaded("zai-coding-plan") || !host.PluginRegistered("zai-coding-plan") || !host.HasAuthProvider("zai-coding-plan") || !host.HasQuotaProvider("zai-coding-plan") || host.HasScheduler() {
+	// API-key only (TWO-1257): the plugin registers no AuthProvider, so the
+	// management UI shows no login card.
+	if !host.PluginLoaded("zai-coding-plan") || !host.PluginRegistered("zai-coding-plan") || host.HasAuthProvider("zai-coding-plan") || !host.HasQuotaProvider("zai-coding-plan") || host.HasScheduler() {
 		t.Fatalf("registration %+v", host.RegisteredPlugins())
 	}
 	infos := host.RegisteredPlugins()
-	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.2.3" {
+	if len(infos) != 1 || !infos[0].SupportsQuota || infos[0].Metadata.Version != "0.2.4" {
 		t.Fatalf("quota capability/metadata %+v", infos)
 	}
+	// Without an AuthProvider the host leaves the parse unhandled and the
+	// auth file loads through the generic file path instead: provider from
+	// type, ID from the relative path, metadata from the file JSON.
 	parse := func(id, key string) *coreauth.Auth {
 		t.Helper()
 		raw, _ := json.Marshal(map[string]any{"type": "zai-coding-plan", "api_key": key, "id": id, "label": "Example"})
-		auth, handled, err := host.ParseAuth(ctx, pluginapi.AuthParseRequest{Provider: "zai-coding-plan", FileName: id + ".json", RawJSON: raw})
-		if err != nil || !handled || auth == nil || auth.Provider != "zai-coding-plan" {
-			t.Fatalf("auth %v %v", handled, err)
+		if _, handled, err := host.ParseAuth(ctx, pluginapi.AuthParseRequest{Provider: "zai-coding-plan", FileName: id + ".json", RawJSON: raw}); err != nil || handled {
+			t.Fatalf("plugin auth unexpectedly handled %v %v", handled, err)
+		}
+		var metadata map[string]any
+		if json.Unmarshal(raw, &metadata) != nil {
+			t.Fatal("invalid fixture JSON")
+		}
+		auth := host.AuthDataToCoreAuth(pluginapi.AuthData{Provider: "zai-coding-plan", FileName: id + ".json", Label: "Example", StorageJSON: raw, Metadata: metadata}, filepath.Join(cfg.AuthDir, id+".json"), id+".json")
+		if auth == nil || auth.Provider != "zai-coding-plan" {
+			t.Fatalf("generic file auth %s did not convert", id)
 		}
 		return auth
 	}
 	auth := parse("example", "example-key")
 	file := filepath.Join(cfg.AuthDir, "example.json")
-	if err = auth.Storage.SaveTokenToFile(file); err != nil {
+	if err := auth.Storage.SaveTokenToFile(file); err != nil {
 		t.Fatal(err)
 	}
 	saved, err := os.ReadFile(file)
