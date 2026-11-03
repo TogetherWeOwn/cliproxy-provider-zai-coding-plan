@@ -19,7 +19,6 @@ credential.
 {
   "type": "zai-coding-plan",
   "api_key": "example-key",
-  "label": "Example account",
   "region": "global"
 }
 ```
@@ -27,13 +26,16 @@ credential.
 `region` is `global` (default) or `cn`. The selected region must match the key's
 entitlement; set it in the file, because there is no login form to fill it in
 later. The plugin deliberately does not accept arbitrary upstream URLs.
-Optional host fields are `label`, `prefix`, `proxy_url`, `weight`, `priority`,
-and `disabled`. An optional `plan` hint is retained but never supplies quota
+Optional host fields are `prefix`, `proxy_url`, `weight`, `priority`,
+and `disabled`. The management UI derives the display label from the file
+itself; a file-level `label` is ignored on the generic file path.
+An optional `plan` hint is retained but never supplies quota
 limits. The auth ID is the file's relative path under the auth directory; a
 user-supplied `id` field is stored but ignored. Every file loads as its own
 auth, so use one file per key. Uploaded files are not validated against the
 shape above at upload time (an unknown `region` loads, then fails at request
-time); the unit-tested ParseAuth in `main.go` documents the intended shape.
+time); the region validation in `authProvider()` in `main.go` documents the
+intended shape, and generic uploads bypass that unregistered validation.
 Refresh preserves the auth record.
 
 | Region | Inference POST | Quota GET |
