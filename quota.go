@@ -37,19 +37,66 @@ func fetchQuota(ctx context.Context, base, key string, client quotaDoer) (plugin
 	}
 	return parseQuota(resp.Body)
 }
+
+// exactNumber bounds both the mantissa and exponent before allocating a rational.
+// Decode numbers only, not quoted strings, and keep decimal rounding exact.
+func exactNumber(raw json.RawMessage) (*big.Rat, bool) {
+	s := strings.TrimSpace(string(raw))
+	if len(s) == 0 || len(s) > 128 || s[0] != '-' && (s[0] < '0' || s[0] > '9') {
+		return nil, false
+	}
+	var n json.Number
+	if json.Unmarshal([]byte(s), &n) != nil {
+		return nil, false
+	}
+	if i := strings.IndexAny(s, "eE"); i >= 0 {
+		exponent, err := strconv.Atoi(s[i+1:])
+		if err != nil || exponent < -128 || exponent > 128 {
+			return nil, false
+		}
+	}
+	return new(big.Rat).SetString(n.String())
+}
+
 func intNumber(raw json.RawMessage) (int64, bool) {
-	if len(raw) == 0 {
+	// Metadata historically accepts quoted JSON numbers. Bound decoding too,
+	// allowing two quote characters around the 128-character numeric token.
+	s := strings.TrimSpace(string(raw))
+	if len(s) == 0 || len(s) > 130 {
 		return 0, false
 	}
 	var n json.Number
-	if json.Unmarshal(raw, &n) != nil {
+	if json.Unmarshal([]byte(s), &n) != nil {
 		return 0, false
 	}
-	r, ok := new(big.Rat).SetString(n.String())
+	r, ok := exactNumber(json.RawMessage(n.String()))
 	if !ok || !r.IsInt() || !r.Num().IsInt64() {
 		return 0, false
 	}
 	return r.Num().Int64(), true
+}
+
+func creditCounts(capacity, consumed json.RawMessage) (int64, int64, bool) {
+	limit, ok := exactNumber(capacity)
+	if !ok || limit.Sign() <= 0 || limit.Cmp(new(big.Rat).SetInt64(1<<63-1)) > 0 {
+		return 0, 0, false
+	}
+	used, ok := exactNumber(consumed)
+	if !ok || used.Sign() < 0 || used.Cmp(limit) > 0 {
+		return 0, 0, false
+	}
+	// Validate original values before rounding, so valid near-exhausted rows
+	// survive while genuinely over-consumed rows remain unknown.
+	wholeLimit := new(big.Int).Quo(limit.Num(), limit.Denom()).Int64()
+	if wholeLimit == 0 {
+		return 0, 0, false
+	}
+	wholeUsed, remainder := new(big.Int), new(big.Int)
+	wholeUsed.QuoRem(used.Num(), used.Denom(), remainder)
+	if remainder.Sign() != 0 {
+		wholeUsed.Add(wholeUsed, big.NewInt(1))
+	}
+	return wholeLimit, min(wholeUsed.Int64(), wholeLimit), true
 }
 func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 	bad := func() (pluginapi.QuotaFetchResponse, error) {
@@ -100,12 +147,8 @@ func parseQuota(raw []byte) (pluginapi.QuotaFetchResponse, error) {
 		if window == "" || seen[window] {
 			continue
 		}
-		usage, ok := intNumber(row.Usage)
-		if !ok || usage <= 0 {
-			continue
-		}
-		used, ok := intNumber(row.CurrentValue)
-		if !ok || used < 0 || used > usage {
+		usage, used, ok := creditCounts(row.Usage, row.CurrentValue)
+		if !ok {
 			continue
 		}
 		bucket := pluginapi.QuotaBucket{Window: window, RemainingFraction: float64(usage-used) / float64(usage)}
