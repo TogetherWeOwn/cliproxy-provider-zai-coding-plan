@@ -76,7 +76,15 @@ Quota displays only recognized `CREDIT_LIMIT` rows. `usage` is capacity;
 `unit=6, number=1` or the observed `number=7` variant. The remaining fraction is
 `(usage-currentValue)/usage`, not the rounded `percentage` field. Reset times are
 epoch milliseconds; null, absent, and zero mean unknown. Integral decimal numbers
-are accepted; fractional credits and malformed/unknown rows are not guessed. A
+are accepted. Fractional credits use exact decimal arithmetic to round capacity
+down and consumption up, giving a conservative approximation before the final
+floating-point display conversion. Valid near-exhausted windows are retained as
+exhausted when rounding crosses capacity; genuinely over-consumed rows are rejected
+before rounding. Capacity below one credit remains unknown. Numeric tokens are
+limited to 128 characters and exponents from -128 through 128; credit capacity
+must fit a positive signed 64-bit integer after rounding and cannot exceed its
+maximum before rounding. Quoted numbers and malformed/unknown rows are not guessed.
+Canonical window labels and the summary-free card layout are unchanged. A
 valid window is retained when another is invalid. Legacy token/MCP-only shapes
 return an unknown-quota error rather than fabricated credit allowances. Plan
 metadata comes from `data.level`/`data.planName`, if present.
