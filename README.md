@@ -83,7 +83,10 @@ exhausted when rounding crosses capacity; genuinely over-consumed rows are rejec
 before rounding. Capacity below one credit remains unknown. Numeric tokens are
 limited to 128 characters and exponents from -128 through 128; credit capacity
 must fit a positive signed 64-bit integer after rounding and cannot exceed its
-maximum before rounding. Quoted numbers and malformed/unknown rows are not guessed.
+maximum before rounding. Quoted credit values and malformed/unknown rows are not
+guessed. Integer metadata (`code`, `unit`, `number`, `nextResetTime`) still accepts
+quoted JSON numbers, subject to the same numeric bounds and signed-64-bit integer
+validation; encoded metadata tokens are bounded to 130 characters including quotes.
 Canonical window labels and the summary-free card layout are unchanged. A
 valid window is retained when another is invalid. Legacy token/MCP-only shapes
 return an unknown-quota error rather than fabricated credit allowances. Plan

@@ -59,7 +59,17 @@ func exactNumber(raw json.RawMessage) (*big.Rat, bool) {
 }
 
 func intNumber(raw json.RawMessage) (int64, bool) {
-	r, ok := exactNumber(raw)
+	// Metadata historically accepts quoted JSON numbers. Bound decoding too,
+	// allowing two quote characters around the 128-character numeric token.
+	s := strings.TrimSpace(string(raw))
+	if len(s) == 0 || len(s) > 130 {
+		return 0, false
+	}
+	var n json.Number
+	if json.Unmarshal([]byte(s), &n) != nil {
+		return 0, false
+	}
+	r, ok := exactNumber(json.RawMessage(n.String()))
 	if !ok || !r.IsInt() || !r.Num().IsInt64() {
 		return 0, false
 	}
