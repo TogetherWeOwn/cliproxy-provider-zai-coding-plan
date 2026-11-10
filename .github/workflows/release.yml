@@ -16,7 +16,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       CGO_ENABLED: '1'
       GOTOOLCHAIN: local
@@ -38,14 +38,20 @@ jobs:
           set -euo pipefail
           # The tag push starts CI and Release independently. Refuse to
           # publish unless the CI workflow has completed successfully for
-          # this exact SHA, so a failing test suite can never produce a
-          # published release. Poll because the CI run may not exist yet.
-          deadline=$(( $(date +%s) + 900 ))
+          # this exact SHA and tag ref, so a failing test suite can never
+          # produce a published release. The headBranch filter keeps the
+          # tag-triggered CI run distinct from a branch push of the same
+          # commit; either could otherwise approve or block the release.
+          # Poll because the CI run may not exist yet. The deadline covers
+          # CI's own 20-minute job timeout, and the job timeout covers
+          # this wait plus the build and publish steps.
+          deadline=$(( $(date +%s) + 1500 ))
           while :; do
-            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 20 --json databaseId,headSha,event,status,conclusion)
-            state=$(python3 -I - "$runs" <<'PY'
+            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 20 --json databaseId,headSha,headBranch,event,status,conclusion)
+            state=$(python3 -I - "$runs" "$GITHUB_REF_NAME" <<'PY'
           import json, sys
-          runs = [r for r in json.loads(sys.argv[1]) if r["event"] == "push"]
+          runs = [r for r in json.loads(sys.argv[1])
+                  if r["event"] == "push" and r.get("headBranch") == sys.argv[2]]
           if any(r["status"] == "completed" and r["conclusion"] not in ("success", None) for r in runs):
               print("failed")
           elif any(r["status"] == "completed" and r["conclusion"] == "success" for r in runs):
