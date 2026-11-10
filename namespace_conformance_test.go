@@ -9,31 +9,31 @@ import (
 )
 
 // Every id this plugin can emit carries the fixed "zai/" namespace exactly
-// once: the static list is served unchanged by the registrar, the static
-// provider and the per-auth discovery path (no subscription exists, so this
-// stays code and tests only).
+// once: the static-only ModelCatalog serves the same list through the
+// registrar, the static provider and the per-auth path. Discovery is
+// unverified (Fetch nil), so per-auth currently serves static; the
+// conformance holds for all three serving paths.
 func TestModelNamespaceConformance(t *testing.T) {
 	ctx := context.Background()
 	var all []pluginapi.ModelInfo
-	all = append(all, models()...)
 
-	reg, err := catalog{}.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{})
+	reg, err := modelCatalog.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{Plugin: pluginapi.Metadata{Name: provider}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	all = append(all, reg.Models...)
 
-	static, err := catalog{}.StaticModels(ctx, pluginapi.StaticModelRequest{})
+	static, err := modelCatalog.StaticModels(ctx, pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: provider}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	all = append(all, static.Models...)
 
-	discovered, err := catalog{}.ModelsForAuth(ctx, pluginapi.AuthModelRequest{})
+	perAuth, err := modelCatalog.ModelsForAuth(ctx, pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: provider}, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	all = append(all, discovered.Models...)
+	all = append(all, perAuth.Models...)
 
 	if len(all) == 0 {
 		t.Fatal("no models to check")

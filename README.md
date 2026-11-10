@@ -67,7 +67,13 @@ executor's host transport, but it follows the same proxy choice: the auth's
 Fixed model namespace `zai/`; auth `prefix` does not replace it. Both
 execution paths and the low-level HTTP executor strip that namespace. No
 legacy aliases or `[1m]` pseudo-models are advertised. Model availability is
-static, not inferred by making provider calls.
+static, served through the kit `ModelCatalog` (`NewModelCatalog`,
+`Namespace: "zai"`, `Fetch: nil`) at kit v0.5.0; it is not inferred by making
+provider calls. Auto-discovery is not implemented: the discovery URL/schema
+is unverified (it needs a valid Coding Plan key for both regions), so no
+fetch is attempted and no credential is read. A follow-up may add discovery
+only after an operator-recorded read-only fixture verifies the exact
+URL/schema for both regions.
 
 ## Quota and errors
 

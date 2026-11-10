@@ -62,23 +62,28 @@ func makePlugin(host kit.Caller) (*kit.Runtime, error) {
 	client := kit.NewQuotaHTTPClient(nil)
 	quota := newQuota(client)
 	ex := kit.Passthrough{Provider: provider, BuildRequest: buildRequest, PrepareHTTP: prepareHTTP, ClassifyError: classifyResponse}
-	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: displayName, Version: "0.2.4", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan", Logo: "https://www.google.com/s2/favicons?domain=z.ai"}, ModelNamespace: "zai", Capabilities: pluginapi.Capabilities{ModelRegistrar: catalog{}, ModelProvider: catalog{}, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
+	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: displayName, Version: "0.2.4", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan", Logo: "https://www.google.com/s2/favicons?domain=z.ai"}, ModelNamespace: "zai", Capabilities: pluginapi.Capabilities{ModelRegistrar: modelCatalog, ModelProvider: modelCatalog, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
 }
 
-type catalog struct{}
+// modelCatalog serves the static GLM list through the kit ModelCatalog
+// pipeline (glob -> overrides -> namespace). Fetch is nil — static-only:
+// the discovery URL/schema is unverified because verification requires
+// a valid Coding Plan key for both key and region held by a
+// credential-holder, and no read-only fixture has landed. Do not add a
+// Fetch against the unverified schema or read a credential; a follow-up
+// may implement discovery only after an operator-recorded fixture for
+// both regions lands. Static-only does not fulfill auto-discovery.
+// Static holds upstream (pre-namespace) ids; Namespace "zai" matches
+// Definition.ModelNamespace and the pipeline prefixes before serving.
+var modelCatalog = kit.NewModelCatalog(kit.ModelCatalogConfig{
+	Namespace: "zai",
+	Static: []pluginapi.ModelInfo{
+		{ID: "glm-5.3", Object: "model", OwnedBy: provider, DisplayName: "GLM-5.3"},
+		{ID: "glm-5.3-flash", Object: "model", OwnedBy: provider, DisplayName: "GLM-5.3 Flash"},
+	},
+	Fetch: nil,
+})
 
-func models() []pluginapi.ModelInfo {
-	return []pluginapi.ModelInfo{{ID: "zai/glm-5.3", Object: "model", OwnedBy: provider, DisplayName: "GLM-5.3"}, {ID: "zai/glm-5.3-flash", Object: "model", OwnedBy: provider, DisplayName: "GLM-5.3 Flash"}}
-}
-func (catalog) RegisterModels(context.Context, pluginapi.ModelRegistrationRequest) (pluginapi.ModelRegistrationResponse, error) {
-	return pluginapi.ModelRegistrationResponse{Provider: provider, Models: models()}, nil
-}
-func (catalog) StaticModels(context.Context, pluginapi.StaticModelRequest) (pluginapi.ModelResponse, error) {
-	return pluginapi.ModelResponse{Provider: provider, Models: models()}, nil
-}
-func (catalog) ModelsForAuth(context.Context, pluginapi.AuthModelRequest) (pluginapi.ModelResponse, error) {
-	return pluginapi.ModelResponse{Provider: provider, Models: models()}, nil
-}
 func authBase(storage []byte, metadata map[string]any) (string, error) {
 	m, err := kit.AuthFields(storage, metadata)
 	if err != nil {
