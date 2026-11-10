@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: '1'
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache-dependency-path: |
+            go.sum
+            integration/hostcompat/go.sum
+      - name: Wait for successful CI on the exact tagged commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The tag push starts CI and Release independently. Refuse to
+          # publish unless the CI workflow has completed successfully for
+          # this exact SHA and tag ref, so a failing test suite can never
+          # produce a published release. The headBranch filter keeps the
+          # tag-triggered CI run distinct from a branch push of the same
+          # commit; either could otherwise approve or block the release.
+          # Poll because the CI run may not exist yet. The deadline covers
+          # CI's own 20-minute job timeout, and the job timeout covers
+          # this wait plus the build and publish steps.
+          deadline=$(( $(date +%s) + 1500 ))
+          while :; do
+            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 20 --json databaseId,headSha,headBranch,event,status,conclusion)
+            state=$(python3 -I - "$runs" "$GITHUB_REF_NAME" <<'PY'
+          import json, sys
+          runs = [r for r in json.loads(sys.argv[1])
+                  if r["event"] == "push" and r.get("headBranch") == sys.argv[2]]
+          if any(r["status"] == "completed" and r["conclusion"] not in ("success", None) for r in runs):
+              print("failed")
+          elif any(r["status"] == "completed" and r["conclusion"] == "success" for r in runs):
+              print("success")
+          else:
+              print("pending")
+          PY
+            )
+            case "$state" in
+              success) echo "CI succeeded for $GITHUB_SHA"; break ;;
+              failed) echo "CI failed for $GITHUB_SHA; refusing to publish" >&2; exit 1 ;;
+            esac
+            if (( $(date +%s) >= deadline )); then
+              echo "Timed out waiting for CI success on $GITHUB_SHA; refusing to publish" >&2
+              exit 1
+            fi
+            sleep 30
+          done
+      - name: Verify tag matches registry version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          case "$tag" in
+            v*) want="${tag#v}" ;;
+            *) echo "Release tag must be v<semver>, got $tag" >&2; exit 1 ;;
+          esac
+          have=$(python3 -I - "$PWD/registry.json" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["plugins"][0]["version"])
+          PY
+          )
+          if [[ "$have" != "$want" ]]; then
+            echo "Tag $tag does not match registry.json version $have" >&2
+            exit 1
+          fi
+          echo "Release version $have matches tag $tag"
+      - name: Build and package production library
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/package-release.sh "${RUNNER_TEMP}/release-output"
+          ls -la "${RUNNER_TEMP}/release-output"
+          cat "${RUNNER_TEMP}/release-output/checksums.txt"
+      - name: Verify packaging, ABI and GLIBC bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/release-output"
+          stage="${RUNNER_TEMP}/release-verify"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          zip_name=$(python3 -I - "$PWD/registry.json" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1], encoding="utf-8"))["plugins"][0]
+          print(f"{p['id']}_{p['version']}_linux_amd64.zip")
+          PY
+          )
+          test -f "$out/$zip_name"
+          test -f "$out/checksums.txt"
+          python3 -I - "$out" "$zip_name" "$stage" <<'PY'
+          import hashlib, pathlib, sys, zipfile
+          out, name, stage = sys.argv[1:]
+          archive = pathlib.Path(out) / name
+          checksums = (pathlib.Path(out) / "checksums.txt").read_text(encoding="ascii")
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert checksums == f"{digest}  {name}\n", "checksums.txt does not match archive SHA-256"
+          with zipfile.ZipFile(archive) as z:
+              names = [i.filename for i in z.infolist()]
+              assert names == ["zai-coding-plan.so", "LICENSE"], f"unexpected archive members {names}"
+              z.extractall(stage)
+          print(f"zip {name} sha256 {digest}")
+          print("checksums.txt matches")
+          PY
+          lib="$stage/zai-coding-plan.so"
+          test -f "$lib"
+          file "$lib"
+          nm -D --defined-only "$lib" > "${RUNNER_TEMP}/symbols.txt"
+          grep -Eq '[[:space:]]T[[:space:]]cliproxy_plugin_init$' "${RUNNER_TEMP}/symbols.txt"
+          objdump -T "$lib" > "${RUNNER_TEMP}/dynamic-symbols.txt"
+          python3 -I - "${RUNNER_TEMP}/dynamic-symbols.txt" <<'PY'
+          import pathlib, re, sys
+          text = pathlib.Path(sys.argv[1]).read_text()
+          versions = [tuple(map(int, v.split("."))) for v in re.findall(r"GLIBC_([0-9.]+)", text)]
+          assert "GLIBC_PRIVATE" not in text, "private GLIBC symbols"
+          assert versions and max(versions) <= (2, 34), f"GLIBC bound violated: {max(versions) if versions else None}"
+          print("max GLIBC " + ".".join(map(str, max(versions))))
+          PY
+          if grep -a -q 'hostcompat_base' "$lib"; then
+            echo 'Test-only upstream configuration leaked into release library' >&2
+            exit 1
+          fi
+          echo "ABI, GLIBC and production-tag checks passed"
+          sha256sum "$lib" | tee "${RUNNER_TEMP}/lib.sha256"
+          sha256sum "$out/$zip_name" | tee "${RUNNER_TEMP}/zip.sha256"
+          cat "${RUNNER_TEMP}/lib.sha256" "${RUNNER_TEMP}/zip.sha256" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified $(cat "${RUNNER_TEMP}/lib.sha256")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Create GitHub Release with assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/release-output"
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite" >&2
+            exit 1
+          fi
+          zip_name=$(python3 -I - "$PWD/registry.json" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1], encoding="utf-8"))["plugins"][0]
+          print(f"{p['id']}_{p['version']}_linux_amd64.zip")
+          PY
+          )
+          gh release create "$tag" \
+            "$out/$zip_name" "$out/checksums.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$tag" \
+            --generate-notes \
+            --verify-tag \
+            --target "$GITHUB_SHA"
+          echo "Created release $tag at $GITHUB_SHA"
