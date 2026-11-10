@@ -13,7 +13,7 @@ import (
 )
 
 func staticAuthReq(authID string) pluginapi.AuthModelRequest {
-	return pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: provider}, AuthID: authID, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)}
+	return pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: displayName}, AuthID: authID, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)}
 }
 
 func modelIDs(models []pluginapi.ModelInfo) []string {
@@ -26,11 +26,11 @@ func modelIDs(models []pluginapi.ModelInfo) []string {
 
 func TestRegistrarAndStaticCatalogNamespaces(t *testing.T) {
 	ctx := context.Background()
-	registered, err := modelCatalog.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{Plugin: pluginapi.Metadata{Name: provider}})
+	registered, err := modelCatalog.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{Plugin: pluginapi.Metadata{Name: displayName}})
 	if err != nil || registered.Provider != provider {
 		t.Fatalf("registrar %+v %v", registered, err)
 	}
-	static, err := modelCatalog.StaticModels(ctx, pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: provider}})
+	static, err := modelCatalog.StaticModels(ctx, pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: displayName}})
 	if err != nil || static.Provider != provider {
 		t.Fatalf("static catalog %+v %v", static, err)
 	}
@@ -154,7 +154,7 @@ func TestContributorDedupWithAndWithoutSibling(t *testing.T) {
 // Executor mapping: the executor strips exactly one leading "zai/" so the
 // catalog-emitted id maps to the upstream id buildRequest sends.
 func TestExecutorMappingAssertion(t *testing.T) {
-	resp, err := modelCatalog.StaticModels(context.Background(), pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: provider}})
+	resp, err := modelCatalog.StaticModels(context.Background(), pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: displayName}})
 	if err != nil {
 		t.Fatal(err)
 	}

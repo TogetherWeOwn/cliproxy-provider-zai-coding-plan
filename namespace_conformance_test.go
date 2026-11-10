@@ -17,19 +17,19 @@ func TestModelNamespaceConformance(t *testing.T) {
 	ctx := context.Background()
 	var all []pluginapi.ModelInfo
 
-	reg, err := modelCatalog.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{Plugin: pluginapi.Metadata{Name: provider}})
+	reg, err := modelCatalog.RegisterModels(ctx, pluginapi.ModelRegistrationRequest{Plugin: pluginapi.Metadata{Name: displayName}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	all = append(all, reg.Models...)
 
-	static, err := modelCatalog.StaticModels(ctx, pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: provider}})
+	static, err := modelCatalog.StaticModels(ctx, pluginapi.StaticModelRequest{Plugin: pluginapi.Metadata{Name: displayName}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	all = append(all, static.Models...)
 
-	perAuth, err := modelCatalog.ModelsForAuth(ctx, pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: provider}, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)})
+	perAuth, err := modelCatalog.ModelsForAuth(ctx, pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: displayName}, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}

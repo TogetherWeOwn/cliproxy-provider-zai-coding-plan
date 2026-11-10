@@ -33,7 +33,7 @@ func TestAuthAndCatalog(t *testing.T) {
 	if err == nil {
 		t.Fatal("missing key accepted")
 	}
-	models, _ := modelCatalog.ModelsForAuth(context.Background(), pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: provider}, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)})
+	models, _ := modelCatalog.ModelsForAuth(context.Background(), pluginapi.AuthModelRequest{Plugin: pluginapi.Metadata{Name: displayName}, AuthProvider: provider, StorageJSON: []byte(`{"api_key":"example-key"}`)})
 	if len(models.Models) != 2 || models.Models[0].ID != "zai/glm-5.3" || models.Models[1].ID != "zai/glm-5.3-flash" {
 		t.Fatalf("catalog: %+v", models)
 	}
