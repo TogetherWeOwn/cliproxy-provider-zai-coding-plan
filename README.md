@@ -143,8 +143,11 @@ The script builds a **production** image (clears build flags/test tags), emits
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. Upload both assets in a matching `v0.2.4`
-GitHub release after review; `registry.json` is a schema-v1 GitHub-release source.
+are tested in `integration/hostcompat`. To publish, push a matching `v0.2.4`
+tag after review: the tag-triggered Release workflow waits for CI to succeed
+on that exact commit, then builds, verifies, and publishes both assets
+automatically — do not upload them manually, and never overwrite an existing
+tag or release. `registry.json` is a schema-v1 GitHub-release source.
 
 The host-compatibility module imports the **unmodified pinned v8.0.49 host** and
 builds a test-only `hostcompat`-tagged library, restricted to literal HTTP loopback

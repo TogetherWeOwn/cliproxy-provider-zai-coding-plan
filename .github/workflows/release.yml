@@ -6,6 +6,7 @@ on:
       - 'v*'
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -29,6 +30,40 @@ jobs:
           cache-dependency-path: |
             go.sum
             integration/hostcompat/go.sum
+      - name: Wait for successful CI on the exact tagged commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The tag push starts CI and Release independently. Refuse to
+          # publish unless the CI workflow has completed successfully for
+          # this exact SHA, so a failing test suite can never produce a
+          # published release. Poll because the CI run may not exist yet.
+          deadline=$(( $(date +%s) + 900 ))
+          while :; do
+            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 20 --json databaseId,headSha,event,status,conclusion)
+            state=$(python3 -I - "$runs" <<'PY'
+          import json, sys
+          runs = [r for r in json.loads(sys.argv[1]) if r["event"] == "push"]
+          if any(r["status"] == "completed" and r["conclusion"] not in ("success", None) for r in runs):
+              print("failed")
+          elif any(r["status"] == "completed" and r["conclusion"] == "success" for r in runs):
+              print("success")
+          else:
+              print("pending")
+          PY
+            )
+            case "$state" in
+              success) echo "CI succeeded for $GITHUB_SHA"; break ;;
+              failed) echo "CI failed for $GITHUB_SHA; refusing to publish" >&2; exit 1 ;;
+            esac
+            if (( $(date +%s) >= deadline )); then
+              echo "Timed out waiting for CI success on $GITHUB_SHA; refusing to publish" >&2
+              exit 1
+            fi
+            sleep 30
+          done
       - name: Verify tag matches registry version
         shell: bash
         run: |
