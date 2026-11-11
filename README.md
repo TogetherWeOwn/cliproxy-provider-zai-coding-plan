@@ -1,7 +1,7 @@
 # Z.ai Coding Plan provider for CLIProxyAPI
 
-A CLIProxyAPI v8.0.49+ (plugin RPC schema 10) dynamic provider plugin using
-[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) v0.5.0 (v8.0.49 plugin ABI: answers RPC schema 10 and refuses older hosts).
+A CLIProxyAPI v8.0.63+ (plugin RPC schema 10) dynamic provider plugin using
+[`cliproxy-provider-kit`](https://github.com/TogetherWeOwn/cliproxy-provider-kit) v0.6.0 (v8.0.63 plugin ABI: answers RPC schema 10 and refuses older hosts).
 It supplies API-key authentication, a static namespaced GLM catalog, Anthropic
 Messages execution, and a read-only credit-quota card. It does **not** install a
 scheduler, estimate credits, refresh quota on inference, or route by quota percent.
@@ -68,7 +68,7 @@ Fixed model namespace `zai/`; auth `prefix` does not replace it. Both
 execution paths and the low-level HTTP executor strip that namespace. No
 legacy aliases or `[1m]` pseudo-models are advertised. Model availability is
 static, served through the kit `ModelCatalog` (`NewModelCatalog`,
-`Namespace: "zai"` and `Fetch: nil`) at kit v0.5.0; it is not inferred by making
+`Namespace: "zai"` and `Fetch: nil`) at kit v0.6.0; it is not inferred by making
 provider calls. Auto-discovery is not implemented: the discovery URL/schema
 is unverified (it needs a valid Coding Plan key for both regions), so no
 fetch is attempted and no credential is read. A follow-up may add discovery
@@ -98,13 +98,21 @@ valid window is retained when another is invalid. Legacy token/MCP-only shapes
 return an unknown-quota error rather than fabricated credit allowances. Plan
 metadata comes from `data.level`/`data.planName`, if present.
 
-| Upstream code | Classification | HTTP / retry hint |
-| --- | --- | --- |
-| `1001`, `1003` | Authentication | 401, non-retryable |
-| `1302`, `1305` | Transient rate/overload, not window exhaustion | 429, retryable, `Retry-After` or 10 s |
-| `1308`, `1310`, `1316`–`1321` | Window/spend exhaustion | 429, retryable, parsed reset or `Retry-After`, otherwise 60 s |
-| `1113`, `1309`, `1313` | Balance, expired plan, or fair-use restriction | 429, non-retryable, 1 h |
-| `1311`, `1314`, `1315` | Model/enterprise/key-scope entitlement | 429, non-retryable, 1 h |
+| Upstream code | Classification | HTTP / retry hint | Scope |
+| --- | --- | --- | --- |
+| `1001`, `1003` | Authentication | 401, non-retryable | — |
+| `1302`, `1305` | Transient rate/overload, not window exhaustion | 429, retryable, `Retry-After` or 10 s | model |
+| `1308`, `1310`, `1316`–`1321` | Window/spend exhaustion | 429, retryable, parsed reset or `Retry-After`, otherwise 60 s | credential |
+| `1113`, `1309`, `1313` | Balance, expired plan, or fair-use restriction | 429, non-retryable, 1 h | credential |
+| `1311`, `1314`, `1315` | Model/enterprise/key-scope entitlement | 429, non-retryable, 1 h | model |
+
+The two credential-scoped rows are account-wide: they carry
+`CredentialScoped: true` on the 429, so the host cools the whole credential
+across all models until `RetryAfterSeconds` instead of retrying the
+exhausted account per model. Their public code, status, and retry hints are
+unchanged; only the scope flag is set. Transient (`1302`/`1305`),
+entitlement (`1311`/`1314`/`1315`), and auth (`1001`/`1003`) failures keep
+model scope.
 
 Structured `next_flush_time` and official “reset at”/“Resets at” message templates
 are recognized, as epoch seconds/milliseconds or timestamps. Zoneless timestamps
@@ -112,9 +120,10 @@ are interpreted as UTC; that assumption still needs live confirmation. Error
 messages exposed by this plugin never include the upstream body or credential.
 Unrecognized errors retain their HTTP status (invalid statuses become 502).
 
-**Host limitation:** the v8.0.48 and v8.0.49 plugin RPC error adapter carries status, code, and
-retry hints but does not implement the native `TransientRateLimitError` interface.
-Consequently native selection applies its generic 429 path, including a
+**Host limitation:** the v8.0.63 plugin RPC error adapter carries status, code,
+retry hints, and the credential-scoped flag, and reports a transient rate limit
+only for the host's `transient_rate_limit` code — which this plugin keeps as
+`rate_limited` — so native selection applies its generic 429 path, including a
 30-second minimum cooldown, even to the plugin's short transient hint. The
 host-loader test verifies this remains short, and verifies exhaustion rotates to
 a sibling auth. Neither the plugin's `retryable` flag nor its distinct code should
@@ -123,7 +132,7 @@ quota-state markings. No local host patch or custom scheduler is included.
 
 ## Build, verify, and package
 
-Requires Go **1.26.10**, CGO, a C compiler, binutils `objdump` and Python 3 (release packaging), and a
+Requires Go **1.26.11**, CGO, a C compiler, binutils `objdump` and Python 3 (release packaging), and a
 Linux amd64 builder for release assets. No local module replacements are used.
 
 ```sh
@@ -138,18 +147,18 @@ nm -D --defined-only /absolute/output/zai-coding-plan.so | grep ' T cliproxy_plu
 ```
 
 The script builds a **production** image (clears build flags/test tags), emits
-`zai-coding-plan_0.2.4_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
+`zai-coding-plan_0.2.5_linux_amd64.zip` containing `zai-coding-plan.so` and `LICENSE`
 (refusing a library that imports GLIBC newer than 2.34), and writes
 `checksums.txt` containing the archive's SHA-256. It creates and removes its own
 scratch directory under the user's cache. It does not upload or install anything.
 The real plugin-store parser and the archive contents/checksum/exported ABI symbol
-are tested in `integration/hostcompat`. To publish, push a matching `v0.2.4`
+are tested in `integration/hostcompat`. To publish, push a matching `v0.2.5`
 tag after review: the tag-triggered Release workflow waits for CI to succeed
 on that exact commit, then builds, verifies, and publishes both assets
 automatically — do not upload them manually, and never overwrite an existing
 tag or release. `registry.json` is a schema-v1 GitHub-release source.
 
-The host-compatibility module imports the **unmodified pinned v8.0.49 host** and
+The host-compatibility module imports the **unmodified pinned v8.0.63 host** and
 builds a test-only `hostcompat`-tagged library, restricted to literal HTTP loopback
 upstreams. Production builds must not use that tag. Tests use placeholder keys
 and `httptest` only, including auth persistence, model catalogs, usage accounting,

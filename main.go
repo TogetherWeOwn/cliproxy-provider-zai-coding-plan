@@ -62,7 +62,7 @@ func makePlugin(host kit.Caller) (*kit.Runtime, error) {
 	client := kit.NewQuotaHTTPClient(nil)
 	quota := newQuota(client)
 	ex := kit.Passthrough{Provider: provider, BuildRequest: buildRequest, PrepareHTTP: prepareHTTP, ClassifyError: classifyResponse}
-	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: displayName, Version: "0.2.4", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan", Logo: "https://www.google.com/s2/favicons?domain=z.ai"}, ModelNamespace: "zai", Capabilities: pluginapi.Capabilities{ModelRegistrar: modelCatalog, ModelProvider: modelCatalog, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
+	return kit.New(kit.Definition{Configure: configureBase, Metadata: pluginapi.Metadata{Name: displayName, Version: "0.2.5", Author: "TogetherWeOwn", GitHubRepository: "https://github.com/TogetherWeOwn/cliproxy-provider-zai-coding-plan", Logo: "https://www.google.com/s2/favicons?domain=z.ai"}, ModelNamespace: "zai", Capabilities: pluginapi.Capabilities{ModelRegistrar: modelCatalog, ModelProvider: modelCatalog, Executor: ex, ExecutorModelScope: pluginapi.ExecutorModelScopeBoth, ExecutorInputFormats: []string{"claude"}, ExecutorOutputFormats: []string{"claude"}, QuotaProvider: quota}, OnShutdown: func(context.Context) error { client.CloseIdleConnections(); return nil }}, host)
 }
 
 // machineProviderCatalog wraps the kit ModelCatalog and stamps the machine
