@@ -89,14 +89,78 @@ func TestErrors(t *testing.T) {
 		status int
 		retry  bool
 		wait   int
-	}{{1001, 401, false, 0}, {1003, 401, false, 0}, {1113, 429, false, 3600}, {1302, 429, true, 10}, {1305, 429, true, 10}, {1308, 429, true, 120}, {1310, 429, true, 120}, {1316, 429, true, 120}, {1317, 429, true, 120}, {1318, 429, true, 120}, {1319, 429, true, 120}, {1320, 429, true, 120}, {1321, 429, true, 120}, {1309, 429, false, 3600}, {1313, 429, false, 3600}} {
+		scoped bool
+	}{{1001, 401, false, 0, false}, {1003, 401, false, 0, false}, {1113, 429, false, 3600, true}, {1302, 429, true, 10, false}, {1305, 429, true, 10, false}, {1308, 429, true, 120, true}, {1310, 429, true, 120, true}, {1316, 429, true, 120, true}, {1317, 429, true, 120, true}, {1318, 429, true, 120, true}, {1319, 429, true, 120, true}, {1320, 429, true, 120, true}, {1321, 429, true, 120, true}, {1309, 429, false, 3600, true}, {1313, 429, false, 3600, true}, {1311, 429, false, 3600, false}, {1314, 429, false, 3600, false}, {1315, 429, false, 3600, false}} {
 		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
 			body, _ := json.Marshal(map[string]any{"error": map[string]any{"code": tc.code, "next_flush_time": now.Add(120 * time.Second).Format(time.RFC3339)}})
 			e := classifyError(pluginapi.HTTPResponse{StatusCode: 400, Body: body}, now)
-			if e.HTTPStatus != tc.status || e.Retryable != tc.retry || e.RetryAfterSeconds != tc.wait {
+			if e.HTTPStatus != tc.status || e.Retryable != tc.retry || e.RetryAfterSeconds != tc.wait || e.CredentialScoped != tc.scoped {
 				t.Fatalf("%+v", e)
 			}
+			if e.CredentialScoped != e.IsCredentialScoped() {
+				t.Fatalf("CredentialScoped mismatch: %+v", e)
+			}
 		})
+	}
+}
+
+// TestQuotaUnscopedBranchesKeepRetryAfter proves the unscoped branches keep
+// their existing retry-after behavior (transient hint, 60s fallback) and stay
+// model-scoped, so only the account-wide branches cool the whole credential.
+func TestQuotaUnscopedBranchesKeepRetryAfter(t *testing.T) {
+	now := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	e := classifyError(pluginapi.HTTPResponse{StatusCode: 429, Headers: http.Header{"Retry-After": {"23"}}, Body: []byte(`{"error":{"code":"1305"}}`)}, now)
+	if e.CredentialScoped || e.RetryAfterSeconds != 23 {
+		t.Fatalf("transient scoped or hint changed: %+v", e)
+	}
+	body, _ := json.Marshal(map[string]any{"error": map[string]any{"code": 1317}})
+	e = classifyError(pluginapi.HTTPResponse{StatusCode: 429, Body: body}, now)
+	if !e.CredentialScoped || e.RetryAfterSeconds != 60 {
+		t.Fatalf("exhausted without reset: %+v", e)
+	}
+}
+
+// streamQuotaClient serves one error body on a 429 stream, mirroring the host
+// transport contract for the kit stream pump.
+type streamQuotaClient struct{ body []byte }
+
+func (c streamQuotaClient) Do(context.Context, pluginapi.HTTPRequest) (pluginapi.HTTPResponse, error) {
+	return pluginapi.HTTPResponse{StatusCode: 429, Body: c.body}, nil
+}
+func (c streamQuotaClient) DoStream(context.Context, pluginapi.HTTPRequest) (pluginapi.HTTPStreamResponse, error) {
+	ch := make(chan pluginapi.HTTPStreamChunk, 1)
+	ch <- pluginapi.HTTPStreamChunk{Payload: c.body}
+	close(ch)
+	return pluginapi.HTTPStreamResponse{StatusCode: 429, Headers: http.Header{"Content-Type": {"application/json"}}, Chunks: ch}, nil
+}
+
+// TestStreamQuotaErrorStaysCredentialScoped proves an upstream stream error
+// for the scoped shape surfaces credential-scoped through the kit runtime:
+// the stream pump classifies the 429 body, and kit MapError (the error_detail
+// carrier) passes the scoped pair through intact.
+func TestStreamQuotaErrorStaysCredentialScoped(t *testing.T) {
+	now := time.Now()
+	reset := now.Add(120 * time.Second).UTC().Format(time.RFC3339)
+	body, _ := json.Marshal(map[string]any{"error": map[string]any{"code": 1317, "message": "Resets at " + reset}})
+	p := kit.Passthrough{Provider: provider, BuildRequest: buildRequest, PrepareHTTP: prepareHTTP, ClassifyError: classifyResponse}
+	_, err := p.ExecuteStream(context.Background(), pluginapi.ExecutorRequest{Payload: []byte(`{"model":"zai/glm-5.3","messages":[]}`), StorageJSON: []byte(`{"api_key":"example-key"}`), HTTPClient: streamQuotaClient{body: body}})
+	if err == nil {
+		t.Fatal("stream quota error hidden")
+	}
+	mapped := kit.MapError(err)
+	if mapped == nil || mapped.Code != "quota_exhausted" || mapped.HTTPStatus != 429 || !mapped.CredentialScoped {
+		t.Fatalf("stream scoped pair lost: %+v", mapped)
+	}
+	if mapped.RetryAfterSeconds <= 0 || mapped.RetryAfterSeconds > 120 {
+		t.Fatalf("stream retry-after = %d, want reset-derived <=120", mapped.RetryAfterSeconds)
+	}
+	// The unscoped transient shape must not cool the whole credential on the
+	// same path.
+	body, _ = json.Marshal(map[string]any{"error": map[string]any{"code": 1305, "message": "slow down"}})
+	_, err = p.ExecuteStream(context.Background(), pluginapi.ExecutorRequest{Payload: []byte(`{"model":"zai/glm-5.3","messages":[]}`), StorageJSON: []byte(`{"api_key":"example-key"}`), HTTPClient: streamQuotaClient{body: body}})
+	mapped = kit.MapError(err)
+	if mapped == nil || mapped.Code != "rate_limited" || mapped.CredentialScoped {
+		t.Fatalf("transient stream scoped: %+v", mapped)
 	}
 }
 func TestModelRewrite(t *testing.T) {
@@ -110,7 +174,7 @@ func TestResetInErrorMessage(t *testing.T) {
 	now := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
 	body := []byte(`{"error":{"code":"1317","message":"quota exhausted, next_flush_time: 2030-01-01 00:02:00"}}`)
 	e := classifyError(pluginapi.HTTPResponse{StatusCode: 429, Body: body}, now)
-	if e.RetryAfterSeconds != 120 {
+	if e.RetryAfterSeconds != 120 || !e.CredentialScoped {
 		t.Fatalf("reset in message ignored: %+v", e)
 	}
 }

@@ -183,7 +183,7 @@ func TestExecutorMappingAssertion(t *testing.T) {
 // Timeline B is documented, never claimed as a guarantee: with Fetch nil
 // there is no fetch to fail, so no recovery question arises. After a
 // Fetch lands, the released kit performs a single fetch per
-// ModelsForAuth invocation (no bounded retry is included in v0.5.0), so
+// ModelsForAuth invocation (no bounded retry is included in v0.6.0), so
 // a transient failure serves last-good and recovery waits for the next
 // host event. This test documents that residual; it does not promise
 // recovery.

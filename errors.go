@@ -42,6 +42,7 @@ func classifyError(r pluginapi.HTTPResponse, now time.Time) *pluginabi.Error {
 	case 1308, 1310, 1316, 1317, 1318, 1319, 1320, 1321:
 		e.Code = "quota_exhausted"
 		e.HTTPStatus = 429
+		e.CredentialScoped = true
 		e.Retryable = true
 		raw := payload.Error.Next
 		if len(raw) == 0 {
@@ -59,8 +60,12 @@ func classifyError(r pluginapi.HTTPResponse, now time.Time) *pluginabi.Error {
 			e.RetryAfterSeconds = 60
 		}
 	case 1113, 1309, 1313:
+		// Balance, expired plan, or fair-use restriction is plan-wide, so
+		// this is credential-scoped too; the code/status/retry hints stay
+		// unchanged for the client.
 		e.Code = "quota_unavailable"
 		e.HTTPStatus = 429
+		e.CredentialScoped = true
 		e.Retryable = false
 		e.RetryAfterSeconds = 3600
 	case 1311, 1314, 1315:

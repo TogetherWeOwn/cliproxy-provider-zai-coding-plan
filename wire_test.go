@@ -62,7 +62,7 @@ func TestOfficialErrorMessageResetTemplates(t *testing.T) {
 		t.Run(message, func(t *testing.T) {
 			body, _ := json.Marshal(map[string]any{"error": map[string]any{"code": "1317", "message": message}})
 			e := classifyError(pluginapi.HTTPResponse{StatusCode: 429, Body: body}, now)
-			if e.Code != "quota_exhausted" || e.RetryAfterSeconds != 120 {
+			if e.Code != "quota_exhausted" || e.RetryAfterSeconds != 120 || !e.CredentialScoped {
 				t.Fatalf("reset hint lost: %+v", e)
 			}
 		})
@@ -73,7 +73,7 @@ func TestEntitlementErrorsAreNotTransientOrExhaustion(t *testing.T) {
 	for _, code := range []int{1311, 1314, 1315} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
 			e := classifyError(pluginapi.HTTPResponse{StatusCode: 429, Body: []byte(fmt.Sprintf(`{"error":{"code":%d,"message":"private upstream detail"}}`, code))}, time.Now())
-			if e.Code != "entitlement_unavailable" || e.HTTPStatus != 429 || e.Retryable || e.RetryAfterSeconds != 3600 || strings.Contains(e.Message, "private upstream") {
+			if e.Code != "entitlement_unavailable" || e.HTTPStatus != 429 || e.CredentialScoped || e.Retryable || e.RetryAfterSeconds != 3600 || strings.Contains(e.Message, "private upstream") {
 				t.Fatalf("entitlement error misclassified or leaked: %+v", e)
 			}
 		})
@@ -82,7 +82,7 @@ func TestEntitlementErrorsAreNotTransientOrExhaustion(t *testing.T) {
 
 func TestTransientErrorRespectsRetryAfter(t *testing.T) {
 	e := classifyError(pluginapi.HTTPResponse{StatusCode: 429, Headers: http.Header{"Retry-After": {"23"}}, Body: []byte(`{"error":{"code":"1305"}}`)}, time.Now())
-	if e.Code != "rate_limited" || !e.Retryable || e.RetryAfterSeconds != 23 {
+	if e.Code != "rate_limited" || e.CredentialScoped || !e.Retryable || e.RetryAfterSeconds != 23 {
 		t.Fatalf("transient hint overwritten: %+v", e)
 	}
 }
